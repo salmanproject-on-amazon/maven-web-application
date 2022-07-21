@@ -1,0 +1,44 @@
+node{
+    
+    
+    def mavenHome= tool name: "maven3.8.6"
+    
+    properties([buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5')), [$class: 'JobLocalConfiguration', changeReasonComment: ''], pipelineTriggers([pollSCM('* * * * *')])])
+    
+    stage ('CheckoutCode')
+    {
+    git branch: 'development', credentialsId: '77bfd62b-cf68-4c92-aa08-8c2509ff8e62', url: 'https://github.com/salmanproject-on-amazon/maven-web-application.git'
+    }
+    
+    stage ('Build')
+    {
+    sh "${mavenHome}/bin/mvn clean package"    
+    }
+    
+    stage ('ExecuteSonarqubeReport')
+    {
+    sh "${mavenHome}/bin/mvn sonar:sonar"    
+    }
+    
+    stage ('UploadArtifactsintoNexus')
+    {
+    sh "${mavenHome}/bin/mvn deploy"   
+    }
+    
+    stage ('DeployAppintoTomcatServer')
+    {
+    sshagent(['dae1e0af-8f8d-461a-a574-8ed82b051516']) {
+    sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@3.109.124.141:/opt/apache-tomcat-9.0.64/webapps"
+    }
+    }
+    
+    stage ('SendEmailNotification')
+    {
+    emailext body: '''BuildOver..
+
+
+    Regards,
+    BharathiTechnologies
+    8328539515''', subject: 'BuildOver..', to: 'salmanhaneesh@gmail.com'    
+    }
+}
