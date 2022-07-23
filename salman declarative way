@@ -1,0 +1,86 @@
+pipeline {
+    
+
+ agent any
+
+tools {
+ maven 'maven3.8.6'
+}
+
+triggers {
+pollSCM('* * * * *')
+}
+
+options {
+//Add the timestamp to the console output
+timestamps()
+//Discard old buids
+buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5'))
+}
+
+
+
+stages {
+
+  stage ('CheckOutCode')
+  {
+    steps {
+    git branch: 'development', credentialsId: '77bfd62b-cf68-4c92-aa08-8c2509ff8e62', url: 'https://github.com/salmanproject-on-amazon/maven-web-application.git'
+  }
+  }
+  
+  stage ('Build')
+  {
+   steps {
+   sh "mvn clean package"
+   }
+  }
+  
+  stage ('ExecuteSonarqubeReport')
+  {
+    steps {
+	sh "mvn sonar:sonar"
+	}
+  }
+  
+  stage ('UploadArtifactsintoNexus')
+  {
+    steps {
+	sh "mvn deploy"
+	}
+  }
+  
+  stage ('DeployAppIntoTomcatServer')
+  {
+    steps{
+    sshagent(['dae1e0af-8f8d-461a-a574-8ed82b051516']) {
+    sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@3.110.222.250:/opt/apache-tomcat-9.0.64/webapps"
+    }
+}
+}
+
+}
+
+post{
+  
+   success {
+	 emailext body: '''Regards, Build is over - declarative way
+
+
+    Bharathi Technologies,
+    8328539515''', subject: 'Build is over - declarative way', to: 'salmandevops45@gmail.com'
+   }
+   failure {
+   emailext body: '''Regards, Build is failure - declarative way
+
+
+    Bharathi Technologies,
+    8328539515''', subject: 'Build is over - declarative way', to: 'salmandevops45@gmail.com'
+   }
+  }
+
+}
+
+    
+
+
